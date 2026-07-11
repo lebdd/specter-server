@@ -79,13 +79,14 @@ module.exports = async function handler(req, res) {
             return res.status(200).json({ hashes: BADGE_HASHES });
         }
 
-        // Return badge stats
+        // Return badge stats + total user count
         if (req.query.stats) {
             const stats = {};
             for (const id of Object.keys(BADGE_HASHES)) {
                 stats[id] = await redisGetInt(`specter:stats:${id}`);
             }
-            return res.status(200).json({ stats });
+            const totalUsers = await redisGetInt("specter:totalUsers");
+            return res.status(200).json({ stats, totalUsers });
         }
 
         // Return badges for a user
@@ -112,6 +113,13 @@ module.exports = async function handler(req, res) {
 
         // Update stats — decrement old badges, increment new ones
         const oldBadges = await redisGet(`specter:${userId}`) ?? [];
+
+        // Track total users — increment if this is their first time
+        if (oldBadges.length === 0 && verified.length > 0) {
+            await redisIncr("specter:totalUsers");
+        } else if (oldBadges.length > 0 && verified.length === 0) {
+            await redisDecr("specter:totalUsers");
+        }
         for (const id of oldBadges) {
             if (!verified.includes(id)) await redisDecr(`specter:stats:${id}`);
         }
