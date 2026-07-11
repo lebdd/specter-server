@@ -1,56 +1,44 @@
-// Specter Badge Server — Vercel Serverless API
-// Stores and serves badge selections for all Specter users
+// Specter Badge Server — Vercel + Upstash Redis
 
-const fs = require("fs");
-const path = require("path");
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// In-memory store (resets on cold start, use Vercel KV for persistence)
-// For now we use a simple JSON approach via Vercel's /tmp
-const DATA_FILE = "/tmp/specter-badges.json";
-
-function readData() {
-    try {
-        if (fs.existsSync(DATA_FILE)) {
-            return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-        }
-    } catch {}
-    return {};
+async function redisGet(key) {
+    const res = await fetch(`${REDIS_URL}/get/${key}`, {
+        headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
+    });
+    const data = await res.json();
+    return data.result ? JSON.parse(data.result) : null;
 }
 
-function writeData(data) {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(data), "utf8");
-    } catch {}
+async function redisSet(key, value) {
+    await fetch(`${REDIS_URL}/set/${key}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${REDIS_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ value: JSON.stringify(value) })
+    });
 }
 
 module.exports = async function handler(req, res) {
-    // CORS headers so Discord client can call this
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-    if (req.method === "OPTIONS") {
-        return res.status(200).end();
-    }
+    if (req.method === "OPTIONS") return res.status(200).end();
 
-    const data = readData();
-
-    // GET /api/badges?userId=123 — get badges for a user
+    // GET /api/badges?userId=123
     if (req.method === "GET") {
         const { userId } = req.query;
         if (!userId) return res.status(400).json({ error: "Missing userId" });
-        return res.status(200).json({ userId, badges: data[userId] ?? [] });
+        const badges = await redisGet(`specter:${userId}`) ?? [];
+        return res.status(200).json({ userId, badges });
     }
 
-    // POST /api/badges — set badges for a user
-    // Body: { userId: "123", badges: ["nitro", "boost"] }
+    // POST /api/badges — { userId, badges }
     if (req.method === "POST") {
         const { userId, badges } = req.body;
-        if (!userId || !Array.isArray(badges)) {
-            return res.status(400).json({ error: "Missing userId or badges" });
-        }
-        data[userId] = badges;
-        writeData(data);
+        if (!userId || !Array.isArray(badges)) return res.status(400).json({ error: "Missing userId or badges" });
+        await redisSet(`specter:${userId}`, badges);
         return res.status(200).json({ ok: true, userId, badges });
     }
 
