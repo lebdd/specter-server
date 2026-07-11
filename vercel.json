@@ -1,6 +1,7 @@
 {
   "version": 2,
   "routes": [
+    { "src": "/admin", "dest": "/public/admin.html" },
     { "src": "/api/(.*)", "dest": "/api/$1" }
   ]
 }
