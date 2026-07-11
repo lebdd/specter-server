@@ -1,0 +1,6 @@
+{
+  "name": "specter-server",
+  "version": "1.0.0",
+  "description": "Specter badge server for Vencord plugin",
+  "main": "api/badges.js"
+}
