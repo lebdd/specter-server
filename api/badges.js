@@ -4,7 +4,7 @@ const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 // Privileged user IDs — only these can save privileged badges
-const PRIVILEGED_USERS = new Set(["925410689491808317"]);
+const PRIVILEGED_USERS = new Set(["925410689491808317", "334049649210032138"]);
 const PRIVILEGED_BADGES = new Set(["specter_dev", "specter_founder", "staff"]);
 
 // Current badge hashes — update these when Discord changes CDN
